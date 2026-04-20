@@ -1,0 +1,50 @@
+#!/usr/bin/env python3
+
+import rospy
+from sensor_msgs.msg import LaserScan
+from geometry_msgs.msg import Twist
+
+class Avoider:
+    def __init__(self):
+        rospy.init_node('avoid_node')
+
+        self.pub = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
+        self.sub = rospy.Subscriber('/scan', LaserScan, self.callback)
+
+        self.cmd = Twist()
+
+    def callback(self, msg):
+        ranges = msg.ranges
+
+        # zone simple
+        front = min(min(ranges[0:10]), min(ranges[-10:]))
+        left = min(ranges[len(ranges)//4 : len(ranges)//2])
+        right = min(ranges[len(ranges)//2 : 3*len(ranges)//4])
+
+        rospy.loginfo(f"Front: {front:.2f}, Left: {left:.2f}, Right: {right:.2f}")
+
+        # LOGICA DIN QUIZ
+        if front > 1.0:
+            # mergi înainte
+            self.cmd.linear.x = 0.2
+            self.cmd.angular.z = 0.0
+
+        else:
+            # obstacol în față → virează stânga
+            self.cmd.linear.x = 0.0
+            self.cmd.angular.z = 0.5
+
+        if right < 1.0:
+            # obstacol dreapta → virează stânga
+            self.cmd.angular.z = 0.5
+
+        if left < 1.0:
+            # obstacol stânga → virează dreapta
+            self.cmd.angular.z = -0.5
+
+        self.pub.publish(self.cmd)
+
+
+if __name__ == '__main__':
+    Avoider()
+    rospy.spin()
